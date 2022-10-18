@@ -1,4 +1,4 @@
-## Upstash REST client
+## Upstash Kafka REST client
 
 Setup:<br/>
 Add **.env** file with below variables to test or 
