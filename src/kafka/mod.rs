@@ -129,17 +129,17 @@ pub struct CredentialResponse {
 
 #[async_trait]
 pub trait KafkaService {
+    async fn create_cluster(&self, req: CreateClusterRequest) -> Result<ClusterResponse>;
+    async fn list_clusters(&self) -> Result<Vec<ClusterResponse>>;
+    async fn get_cluster(&self, id: &str) -> Result<ClusterResponse>;
+    async fn rename_cluster(&self, req: RenameClusterRequest, id: &str) -> Result<ClusterResponse>;
+    async fn reset_password(&self, id: &str) -> Result<ClusterResponse>;
+    async fn delete_cluster(&self, id: &str) -> Result<String>;
     async fn create_topic(&self, req: CreateTopicRequest) -> Result<TopicResponse>;
     async fn get_topic(&self, id: &str) -> Result<TopicResponse>;
     async fn list_topics(&self, id: &str) -> Result<Vec<TopicResponse>>;
     async fn reconfigure_topic(&self, req: ReconfigureTopicRequest, id: &str) -> Result<TopicResponse>;
     async fn delete_topic(&self, id: &str) -> Result<String>;
-    async fn create_cluster(&self, req: CreateClusterRequest) -> Result<ClusterResponse>;
-    async fn list_clusters(&self) -> Result<Vec<ClusterResponse>>;
-    async fn get_cluster(&self, id: &str) -> Result<ClusterResponse>;
-    async fn rename_cluster(&self, req: RenameClusterRequest, id: &str) -> Result<ClusterResponse>;
-    async fn update_password(&self, id: &str) -> Result<ClusterResponse>;
-    async fn delete_cluster(&self, id: &str) -> Result<String>;
     async fn create_credential(&self, req: CreateCredentialRequest) -> Result<CredentialResponse>;
     async fn list_credentials(&self) -> Result<Vec<CredentialResponse>>;
     async fn delete_credential(&self, id: &str) -> Result<String>;
@@ -167,13 +167,18 @@ impl<'client> KafkaService for Handler<'client> {
         self.client.post(&url, Option::None::<&()>, Some(&req)).await
     }
 
-    async fn update_password(&self, id: &str) -> Result<ClusterResponse> {
-        let url = format!("{}/update-password/{}", &self.url, id);
+    async fn reset_password(&self, id: &str) -> Result<ClusterResponse> {
+        let url = format!("{}/reset-password/{}", &self.url, id);
         self.client.post(&url, Option::None::<&()>, Option::None::<&()>).await
     }
 
+    async fn delete_cluster(&self, id: &str) -> Result<String> {
+        let url = format!("{}/cluster/{}", &self.url, id);
+        self.client.delete(&url, Option::None::<&()>).await
+    }
+
     async fn create_topic(&self, req: CreateTopicRequest) -> Result<TopicResponse> {
-        let url = format!("{}/topic ", &self.url);
+        let url = format!("{}/topic", &self.url);
         self.client.post(url, Option::None::<&()>, Some(&req)).await
     }
 
@@ -194,11 +199,6 @@ impl<'client> KafkaService for Handler<'client> {
 
     async fn delete_topic(&self, id: &str) -> Result<String> {
         let url = format!("{}/topic/{}", &self.url, id);
-        self.client.delete(&url, Option::None::<&()>).await
-    }
-
-    async fn delete_cluster(&self, id: &str) -> Result<String> {
-        let url = format!("{}/cluster/{}", &self.url, id);
         self.client.delete(&url, Option::None::<&()>).await
     }
 

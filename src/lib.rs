@@ -150,95 +150,110 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    async fn create_client() {
-        dotenv::dotenv().unwrap();
+    async fn create_cluster() {
+        // cargo test -p upstash --lib -- tests::create_cluster --exact --nocapture
 
+        dotenv::dotenv().unwrap();
         Client::from_env().initialize();
         let client = Client::instance().unwrap();
 
         let req = CreateClusterRequest {
-            name: "tcluster".to_string(),
+            name: "implrust".to_string(),
             region: CreateClusterRegion::EuWest1,
             multizone: true,
         };
 
-        client.kafka().create_cluster(req).await.unwrap();
+        let response = client.kafka().create_cluster(req).await.unwrap();
+        println!("Upstash Create Cluster:\n{:#?}", &response);
     }
 
     #[tokio::test]
-    async fn list_cluster() {
+    async fn list_clusters() {
+        // cargo test -p upstash --lib -- tests::list_clusters --exact --nocapture
+
         dotenv::dotenv().unwrap();
         Client::from_env().initialize();
-
         let client = Client::instance().unwrap();
-        let a = client.kafka().list_clusters().await.unwrap();
-        println!("a = {:?}", &a);
+
+        let list = client.kafka().list_clusters().await.unwrap();
+        println!("Upstash List Clusters:\n{:#?}", &list);
     }
 
     #[tokio::test]
     async fn get_cluster() {
+        // cargo test -p upstash --lib -- tests::get_cluster --exact --nocapture
+
         dotenv::dotenv().unwrap();
         Client::from_env().initialize();
-
         let client = Client::instance().unwrap();
-        client
+
+        let cluster = client
             .kafka()
-            .get_cluster("6f93ec4e-8f3c-4487-be20-eda0434bb34b")
+            .get_cluster("1b729d79-0ac1-49cc-8226-ce55d5641e6a")
             .await
             .unwrap();
+        println!("Upstash Get Cluster:\n{:#?}", &cluster);
     }
 
     #[tokio::test]
     async fn rename_cluster() {
+        // cargo test -p upstash --lib -- tests::rename_cluster --exact --nocapture
+
         dotenv::dotenv().unwrap();
         Client::from_env().initialize();
-
         let client = Client::instance().unwrap();
+
         let req = RenameClusterRequest {
-            name: "newcluster".to_string(),
+            name: "implcrab".to_string(),
         };
-        client
+        let cluster = client
             .kafka()
-            .rename_cluster(req, "27215fb2-bf89-4b15-a260-4ab262529957")
+            .rename_cluster(req, "1b729d79-0ac1-49cc-8226-ce55d5641e6a")
             .await
             .unwrap();
+        println!("Upstash Rename Cluster:\n{:#?}", &cluster);
     }
 
     #[tokio::test]
-    async fn update_password() {
+    async fn reset_password() {
+        // cargo test -p upstash --lib -- tests::reset_password --exact --nocapture
+
         dotenv::dotenv().unwrap();
         Client::from_env().initialize();
-
         let client = Client::instance().unwrap();
-        client
+
+        let cluster = client
             .kafka()
-            .update_password("6f93ec4e-8f3c-4487-be20-eda0434bb34b")
+            .reset_password("1b729d79-0ac1-49cc-8226-ce55d5641e6a")
             .await
             .unwrap();
+        println!("Upstash Reset Password:\n{:#?}", &cluster);
     }
 
     #[tokio::test]
     async fn delete_cluster() {
-        dotenv::dotenv().unwrap();
+        // cargo test -p upstash --lib -- tests::delete_cluster --exact --nocapture
 
+        dotenv::dotenv().unwrap();
         Client::from_env().initialize();
         let client = Client::instance().unwrap();
-        client
+
+        let result = client
             .kafka()
-            .delete_cluster("4748904d-a571-4235-b407-599a9ef50173")
+            .delete_cluster("1b729d79-0ac1-49cc-8226-ce55d5641e6a")
             .await
             .unwrap();
+        println!("Upstash Delete Cluster:\n{:#?}", &result);
     }
 
     #[tokio::test]
     async fn create_topic() {
         dotenv::dotenv().unwrap();
-
         Client::from_env().initialize();
         let client = Client::instance().unwrap();
 
         let req = CreateTopicRequest {
-            name: "tTopic".to_string(),
+            name: "kafka".to_string(),
             partitions: 1,
             retention_time: 1234,
             retention_size: 4567,
