@@ -35,18 +35,18 @@ pub enum CreateTopicCleanupPolicy {
 pub struct CreateTopicRequest {
     pub name: String,
     pub partitions: u32,
-    pub retention_time: u32,
-    pub retention_size: u32,
-    pub max_message_size: u32,
+    pub retention_time: i32,
+    pub retention_size: i32,
+    pub max_message_size: i32,
     pub cleanup_policy: CreateTopicCleanupPolicy,
     pub cluster_id: String,
 }
 
 #[derive(Debug, Clone, Serialize)]
 pub struct ReconfigureTopicRequest {
-    pub retention_time: Option<u32>,
-    pub retention_size: Option<u32>,
-    pub max_message_size: Option<u32>,
+    pub retention_time: Option<i32>,
+    pub retention_size: Option<i32>,
+    pub max_message_size: Option<i32>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -64,9 +64,9 @@ pub struct TopicResponse {
     pub username: String,
     pub password: String,
     pub cleanup_policy: String,
-    pub retention_size: u32,
-    pub retention_time: u32,
-    pub max_message_size: u32,
+    pub retention_size: i32,
+    pub retention_time: i32,
+    pub max_message_size: i32,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -86,7 +86,7 @@ pub struct ClusterResponse {
     pub max_retention_time: usize,
     pub max_messages_per_second: u32,
     pub creation_time: usize,
-    pub max_message_size: u32,
+    pub max_message_size: i32,
     pub max_partitions: u32,
 }
 
@@ -127,6 +127,38 @@ pub struct CredentialResponse {
     pub encoded_username: String,
 }
 
+#[derive(Debug, Clone, Deserialize)]
+pub struct Stat {
+    pub x: String,
+    pub y: u64,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct ClusterStats {
+    pub throughput: Vec<Stat>,
+    pub produce_throughput: Vec<Stat>,
+    pub consume_throughput: Vec<Stat>,
+    pub diskusage: Vec<Stat>,
+    pub days: Vec<String>,
+    pub dailyproduce: Vec<Stat>,
+    pub dailyconsume: Vec<Stat>,
+    pub total_monthly_storage: u64,
+    pub total_monthly_billing: u64,
+    pub total_monthly_produce: u64,
+    pub total_monthly_consume: u64,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct TopicStats {
+    pub throughput: Vec<Stat>,
+    pub produce_throughput: Vec<Stat>,
+    pub consume_throughput: Vec<Stat>,
+    pub diskusage: Vec<Stat>,
+    pub total_monthly_storage: u64,
+    pub total_monthly_produce: u64,
+    pub total_monthly_consume: u64,
+}
+
 #[async_trait]
 pub trait KafkaService {
     async fn create_cluster(&self, req: CreateClusterRequest) -> Result<ClusterResponse>;
@@ -143,6 +175,8 @@ pub trait KafkaService {
     async fn create_credential(&self, req: CreateCredentialRequest) -> Result<CredentialResponse>;
     async fn list_credentials(&self) -> Result<Vec<CredentialResponse>>;
     async fn delete_credential(&self, id: &str) -> Result<String>;
+    async fn cluster_stats(&self, id: &str) -> Result<ClusterStats>;
+    async fn topic_stats(&self, id: &str) -> Result<TopicStats>;
 }
 
 #[async_trait]
@@ -203,7 +237,7 @@ impl<'client> KafkaService for Handler<'client> {
     }
 
     async fn create_credential(&self, req: CreateCredentialRequest) -> Result<CredentialResponse> {
-        let url = format!("{}/credential ", &self.url);
+        let url = format!("{}/credential", &self.url);
         self.client.post(url, Option::None::<&()>, Some(&req)).await
     }
 
@@ -215,5 +249,15 @@ impl<'client> KafkaService for Handler<'client> {
     async fn delete_credential(&self, id: &str) -> Result<String> {
         let url = format!("{}/credential/{}", &self.url, id);
         self.client.delete(&url, Option::None::<&()>).await
+    }
+
+    async fn cluster_stats(&self, id: &str) -> Result<ClusterStats> {
+        let url = format!("{}/stats/cluster/{}", &self.url, id);
+        self.client.get(&url, Option::None::<&()>).await
+    }
+
+    async fn topic_stats(&self, id: &str) -> Result<TopicStats> {
+        let url = format!("{}/stats/topic/{}", &self.url, id);
+        self.client.get(&url, Option::None::<&()>).await
     }
 }
