@@ -20,8 +20,14 @@ As a rust library, you can use this in your binary rust project, here it is docu
 .env
 --- 
 ```
+# For upstash operations 
 UPSTASH_EMAIL='demo@email.com'
 UPSTASH_API_KEY='a0f9f7fc-7d5c-4202-8aa8-719015fc5a7c'
+# For kafka operations
+KAFKA_REST_SERVER='glowing-crab-5802-eu1-rest-kafka.upstash.io'
+KAFKA_USERNAME='Z2xvd2luZy1jcmFiLTU4MDIk97vR6sOhR7IloEyH3f_5tOF6POOj-KlEgXbF7QA'
+KAFKA_PASSWORD='HVDHK7ddUTy_BT69rxHxBaNKbCH46vqW6GjOYbKjxMMDusnc1yXLRUz7_7iFfdV7'
+
 ```
 if you are using this library from rust binary project means also, above two steps are required.
 
