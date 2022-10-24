@@ -52,6 +52,7 @@ There are lot more api endpoints available for kafka service.<br/>
 To know more about api endpoints refer: https://developer.upstash.com/#kafka <br/>
 Here some rest api actions are documented.<br/>
 All tests are available in lib.rs test module.<br>
+For more details, kindly refer source<br>
 
 List of methods<br>
 1. Creating Kafka Cluster
