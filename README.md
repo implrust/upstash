@@ -32,12 +32,18 @@ Before calling or testing rest api endpoints, it is required to initialize <br/>
     2. client <br/>
 ```rs
 dotenv::dotenv().unwrap();
-Client::from_env().initialize();
+/// For upstash operations
+Client::upstash_env().initialize();
+/// For kafka operations
+Client::kafka_env().initialize();
 ```
 if you are in binary project, then place the above code in main.rs<br/>
 and get the client instance where you want, either in module methods or in test cases.
 ```rs
-let client = Client::instance().unwrap();
+/// For upstash operations
+let client = Client::upstash_instance().unwrap();
+/// For kafka operations
+let client = Client::kafka_instance().unwrap();
 ```
 
 ## Step 4: Calling / Testing - REST API Endpoints
@@ -64,6 +70,19 @@ List of methods<br>
 14. Delete Kafka Credential
 15. Get Kafka Cluster Stats
 16. Get Kafka Topic Stats
+
+The above are upstash related rest api, and still some more are there,
+they related to kafka operations like producer, consumer.
+
+List of Kafka operations<br>
+1. Produce
+2. Fetch
+3. Consume
+4. Commit
+5. List Consumers
+6. Delete Consumer
+
+For these operations, you have to initialize using kafka_env(), and get client instance from kafka_instance().
 
 ### 1. Creating Kafka Cluster
 ---

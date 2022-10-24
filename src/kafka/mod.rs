@@ -238,6 +238,26 @@ pub struct CommitResponse {
     pub error: String,
     pub status: u16,
 }
+#[derive(Debug, Clone, Deserialize)]
+pub struct Topic {
+    pub topic: String,
+}
+#[derive(Debug, Clone, Deserialize)]
+pub struct ConsumerInstance {
+    pub name: String,
+    pub topics: Vec<Topic>,
+}
+#[derive(Debug, Clone, Deserialize)]
+pub struct GroupInstance {
+    pub name: String,
+    pub instances: Vec<ConsumerInstance>,
+}
+#[derive(Debug, Clone, Deserialize)]
+pub struct DeleteConsumerResponse {
+    pub result: String,
+    pub error: String,
+    pub status: u16,
+}
 
 #[async_trait]
 pub trait KafkaService {
@@ -261,8 +281,8 @@ pub trait KafkaService {
     async fn fetch(&self, req: FetchRequest) -> Result<Vec<FetchResponse>>;
     async fn consume(&self, group: &str, consumer: &str, req: ConsumeRequest) -> Result<Vec<ConsumeResponse>>;
     async fn commit(&self, group: &str, consumer: &str, req: Vec<CommitRequest>) -> Result<CommitResponse>;
-    async fn list_consumer(&self) -> Result<()>;
-    async fn delete_consumer(&self, group: &str, consumer: &str) -> Result<()>;
+    async fn list_consumers(&self) -> Result<Vec<GroupInstance>>;
+    async fn delete_consumer(&self, group: &str, consumer: &str) -> Result<DeleteConsumerResponse>;
 }
 
 #[async_trait]
@@ -372,23 +392,13 @@ impl<'client> KafkaService for Handler<'client> {
         self.client.post(&url, Option::None::<&()>, Some(&req), None).await
     }
 
-    async fn list_consumer(&self) -> Result<()> {
+    async fn list_consumers(&self) -> Result<Vec<GroupInstance>> {
         let url = format!("{}consumers", &self.url);
-        let result: Result<serde_json::Value> = self.client.get(&url, Option::None::<&()>).await;
-        match result {
-            Ok(res) => println!("result: {:?}", res),
-            Err(e) => println!("error: {:?}", e.to_string()),
-        }
-        Ok(())
+        self.client.get(&url, Option::None::<&()>).await
     }
 
-    async fn delete_consumer(&self, group: &str, consumer: &str) -> Result<()> {
+    async fn delete_consumer(&self, group: &str, consumer: &str) -> Result<DeleteConsumerResponse> {
         let url = format!("{}delete-consumer/{}/{}", &self.url, group, consumer);
-        let result: Result<serde_json::Value> = self.client.delete(&url, Option::None::<&()>).await;
-        match result {
-            Ok(res) => println!("result: {:?}", res),
-            Err(e) => println!("error: {:?}", e.to_string()),
-        }
-        Ok(())
+        self.client.delete(&url, Option::None::<&()>).await
     }
 }

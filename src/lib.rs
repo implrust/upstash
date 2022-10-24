@@ -1,5 +1,5 @@
 use error::{Context, Error, ErrorKind, Result};
-use reqwest::header::{HeaderMap, HeaderValue};
+use reqwest::header::HeaderMap;
 
 use once_cell::sync::OnceCell;
 
@@ -522,16 +522,16 @@ mod tests {
 
     #[tokio::test]
     async fn commit() {
-        // cargo test -p upstash --lib -- tests::consume --exact --nocapture
+        // cargo test -p upstash --lib -- tests::commit --exact --nocapture
 
         dotenv::dotenv().unwrap();
         Client::kafka_env().initialize();
         let client = Client::kafka_instance().unwrap();
 
         let req = vec![
-            CommitRequest::new("one", 0, 85),
-            CommitRequest::new("one", 0, 86),
-            CommitRequest::new("one", 0, 87),
+            CommitRequest::new("one", 0, 106),
+            CommitRequest::new("one", 0, 107),
+            CommitRequest::new("one", 0, 108),
         ];
         let group = "g1";
         let consumer = "c1";
@@ -541,14 +541,14 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn list_consumer() {
-        // cargo test -p upstash --lib -- tests::list_consumer --exact --nocapture
+    async fn list_consumers() {
+        // cargo test -p upstash --lib -- tests::list_consumers --exact --nocapture
 
         dotenv::dotenv().unwrap();
         Client::kafka_env().initialize();
         let client = Client::kafka_instance().unwrap();
 
-        let response = client.handler("").list_consumer().await;
+        let response = client.handler("").list_consumers().await;
         println!("Upstash Kafka List Consumer:\n{:#?}", &response);
     }
 
