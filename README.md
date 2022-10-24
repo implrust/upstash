@@ -15,7 +15,9 @@ This Rust library is for Upstash kafka REST API client, used to access kafka end
 As a rust library, you can use this in your binary rust project, here it is documented as a standalone library's cargo test, for that clone this repository and do the following,
 
 1. create **.env** file in the root folder
-2. create two variables **UPSTASH_EMAIL, UPSTASH_API_KEY** <br/>
+2. create variables **UPSTASH_EMAIL, UPSTASH_API_KEY, KAFKA_REST_SERVER, KAFKA_USERNAME, KAFKA_PASSWORD** <br/>
+
+variables **KAFKA_REST_SERVER, KAFKA_USERNAME, KAFKA_PASSWORD** can be created only after cluster creation
 
 .env
 --- 
