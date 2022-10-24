@@ -1,4 +1,6 @@
 use error::{Context, Error, ErrorKind, Result};
+use reqwest::header::{HeaderMap, HeaderValue};
+
 use once_cell::sync::OnceCell;
 
 pub mod error;
@@ -7,7 +9,8 @@ mod kafka;
 pub use kafka::*;
 use serde::{de::DeserializeOwned, Serialize};
 
-static INSTANCE: OnceCell<Client> = OnceCell::new();
+static UPSTASH_INSTANCE: OnceCell<Client> = OnceCell::new();
+static KAFKA_INSTANCE: OnceCell<Client> = OnceCell::new();
 
 pub struct Handler<'client> {
     client: &'client Client,
@@ -17,7 +20,9 @@ pub struct Handler<'client> {
 impl<'client> Handler<'client> {
     fn new(client: &'client Client, path: &str) -> Self {
         let mut url = client.base_url.clone();
-        url.set_path(path);
+        if !path.is_empty() {
+            url.set_path(path);
+        }
         Self { client, url }
     }
 }
@@ -29,7 +34,7 @@ pub struct Client {
 }
 
 impl Client {
-    pub fn from_env() -> Self {
+    pub fn upstash_env() -> Self {
         let inner = reqwest::Client::new();
         let email = std::env::var("UPSTASH_EMAIL").expect("UPSTASH_EMAIL not set");
         let api_key = std::env::var("UPSTASH_API_KEY").expect("UPSTASH_API_KEY not set");
@@ -39,18 +44,54 @@ impl Client {
         Self { inner, base_url }
     }
 
-    pub fn initialize(self) {
-        INSTANCE.set(self).unwrap()
+    pub fn kafka_env() -> Self {
+        let inner = reqwest::Client::new();
+        let username = std::env::var("KAFKA_USERNAME").expect("KAFKA_USERNAME not set");
+        let password = std::env::var("KAFKA_PASSWORD").expect("KAFKA_PASSWORD not set");
+        let rest_server = std::env::var("KAFKA_REST_SERVER").expect("KAFKA_REST_SERVER not set");
+        let rest_server = format!("https://{}", &rest_server);
+        let mut base_url = url::Url::parse(&rest_server).unwrap();
+        base_url.set_username(&username).unwrap();
+        base_url.set_password(Some(&password)).unwrap();
+        Self { inner, base_url }
     }
 
-    pub fn instance() -> Option<&'static Self> {
-        INSTANCE.get()
+    pub fn initialize(self) {
+        if let Some(domain) = self.base_url.domain() {
+            if domain == "api.upstash.com" {
+                UPSTASH_INSTANCE.set(self).unwrap()
+            } else {
+                KAFKA_INSTANCE.set(self).unwrap()
+            }
+        } else {
+            panic!("initialize error");
+        }
+    }
+
+    pub fn upstash_instance() -> Option<&'static Self> {
+        UPSTASH_INSTANCE.get()
+    }
+
+    pub fn kafka_instance() -> Option<&'static Self> {
+        KAFKA_INSTANCE.get()
     }
 
     pub fn kafka(&self) -> Handler {
         Handler::new(self, "v2/kafka")
     }
 
+    pub fn producer(&self) -> Handler {
+        Handler::new(self, "produce")
+    }
+    pub fn fetcher(&self) -> Handler {
+        Handler::new(self, "fetch")
+    }
+    pub fn consumer(&self) -> Handler {
+        Handler::new(self, "consume")
+    }
+    pub fn handler(&self, path: &str) -> Handler {
+        Handler::new(self, path)
+    }
     pub fn absolute_url(&self, url: impl AsRef<str>) -> Result<url::Url> {
         self.base_url
             .join(url.as_ref())
@@ -85,14 +126,20 @@ impl Client {
             .map_err(|err| Error::new(err.to_string(), ErrorKind::ApiError(err.to_string())))
     }
 
-    pub async fn post<A, P, T, R>(&self, route: A, parameters: Option<&P>, json: Option<&R>) -> Result<T>
+    pub async fn post<A, P, T, R>(
+        &self,
+        route: A,
+        parameters: Option<&P>,
+        json: Option<&R>,
+        headers: Option<HeaderMap>,
+    ) -> Result<T>
     where
         A: AsRef<str>,
         P: Serialize + ?Sized,
         T: DeserializeOwned,
         R: Serialize + ?Sized,
     {
-        self._post(self.absolute_url(route)?, parameters, json)
+        self._post(self.absolute_url(route)?, parameters, json, headers)
             .await?
             .json()
             .await
@@ -128,6 +175,7 @@ impl Client {
         url: impl reqwest::IntoUrl,
         parameters: Option<&P>,
         json: Option<&T>,
+        headers: Option<HeaderMap>,
     ) -> Result<reqwest::Response> {
         let mut request = self.inner.post(url);
         if let Some(parameters) = parameters {
@@ -135,6 +183,9 @@ impl Client {
         }
         if let Some(json) = json {
             request = request.json(json);
+        }
+        if let Some(headers) = headers {
+            request = request.headers(headers)
         }
         self.execute(request).await
     }
@@ -154,8 +205,8 @@ mod tests {
         // cargo test -p upstash --lib -- tests::create_cluster --exact --nocapture
 
         dotenv::dotenv().unwrap();
-        Client::from_env().initialize();
-        let client = Client::instance().unwrap();
+        Client::upstash_env().initialize();
+        let client = Client::upstash_instance().unwrap();
 
         let req = CreateClusterRequest {
             name: "implrust".to_string(),
@@ -172,8 +223,8 @@ mod tests {
         // cargo test -p upstash --lib -- tests::list_clusters --exact --nocapture
 
         dotenv::dotenv().unwrap();
-        Client::from_env().initialize();
-        let client = Client::instance().unwrap();
+        Client::upstash_env().initialize();
+        let client = Client::upstash_instance().unwrap();
 
         let list = client.kafka().list_clusters().await.unwrap();
         println!("Upstash List Clusters:\n{:#?}", &list);
@@ -184,8 +235,8 @@ mod tests {
         // cargo test -p upstash --lib -- tests::get_cluster --exact --nocapture
 
         dotenv::dotenv().unwrap();
-        Client::from_env().initialize();
-        let client = Client::instance().unwrap();
+        Client::upstash_env().initialize();
+        let client = Client::upstash_instance().unwrap();
 
         let cluster = client
             .kafka()
@@ -200,8 +251,8 @@ mod tests {
         // cargo test -p upstash --lib -- tests::rename_cluster --exact --nocapture
 
         dotenv::dotenv().unwrap();
-        Client::from_env().initialize();
-        let client = Client::instance().unwrap();
+        Client::upstash_env().initialize();
+        let client = Client::upstash_instance().unwrap();
 
         let req = RenameClusterRequest {
             name: "implcrab".to_string(),
@@ -219,8 +270,8 @@ mod tests {
         // cargo test -p upstash --lib -- tests::reset_password --exact --nocapture
 
         dotenv::dotenv().unwrap();
-        Client::from_env().initialize();
-        let client = Client::instance().unwrap();
+        Client::upstash_env().initialize();
+        let client = Client::upstash_instance().unwrap();
 
         let cluster = client
             .kafka()
@@ -235,8 +286,8 @@ mod tests {
         // cargo test -p upstash --lib -- tests::delete_cluster --exact --nocapture
 
         dotenv::dotenv().unwrap();
-        Client::from_env().initialize();
-        let client = Client::instance().unwrap();
+        Client::upstash_env().initialize();
+        let client = Client::upstash_instance().unwrap();
 
         let result = client
             .kafka()
@@ -251,8 +302,8 @@ mod tests {
         // cargo test -p upstash --lib -- tests::create_topic --exact --nocapture
 
         dotenv::dotenv().unwrap();
-        Client::from_env().initialize();
-        let client = Client::instance().unwrap();
+        Client::upstash_env().initialize();
+        let client = Client::upstash_instance().unwrap();
 
         let req = CreateTopicRequest {
             name: "one".to_string(),
@@ -272,8 +323,8 @@ mod tests {
         // cargo test -p upstash --lib -- tests::get_topic --exact --nocapture
 
         dotenv::dotenv().unwrap();
-        Client::from_env().initialize();
-        let client = Client::instance().unwrap();
+        Client::upstash_env().initialize();
+        let client = Client::upstash_instance().unwrap();
 
         let topic = client
             .kafka()
@@ -288,8 +339,8 @@ mod tests {
         // cargo test -p upstash --lib -- tests::list_topics --exact --nocapture
 
         dotenv::dotenv().unwrap();
-        Client::from_env().initialize();
-        let client = Client::instance().unwrap();
+        Client::upstash_env().initialize();
+        let client = Client::upstash_instance().unwrap();
 
         let topics = client
             .kafka()
@@ -304,8 +355,8 @@ mod tests {
         // cargo test -p upstash --lib -- tests::reconfigure_topic --exact --nocapture
 
         dotenv::dotenv().unwrap();
-        Client::from_env().initialize();
-        let client = Client::instance().unwrap();
+        Client::upstash_env().initialize();
+        let client = Client::upstash_instance().unwrap();
 
         let req = ReconfigureTopicRequest {
             retention_time: Some(86400000),
@@ -325,8 +376,8 @@ mod tests {
         // cargo test -p upstash --lib -- tests::delete_topic --exact --nocapture
 
         dotenv::dotenv().unwrap();
-        Client::from_env().initialize();
-        let client = Client::instance().unwrap();
+        Client::upstash_env().initialize();
+        let client = Client::upstash_instance().unwrap();
 
         let result = client
             .kafka()
@@ -341,8 +392,8 @@ mod tests {
         // cargo test -p upstash --lib -- tests::create_credential --exact --nocapture
 
         dotenv::dotenv().unwrap();
-        Client::from_env().initialize();
-        let client = Client::instance().unwrap();
+        Client::upstash_env().initialize();
+        let client = Client::upstash_instance().unwrap();
 
         let req = CreateCredentialRequest {
             credential_name: "Generate".to_string(),
@@ -360,8 +411,8 @@ mod tests {
         // cargo test -p upstash --lib -- tests::list_credentials --exact --nocapture
 
         dotenv::dotenv().unwrap();
-        Client::from_env().initialize();
-        let client = Client::instance().unwrap();
+        Client::upstash_env().initialize();
+        let client = Client::upstash_instance().unwrap();
 
         let credentials = client.kafka().list_credentials().await.unwrap();
         println!("Upstash Kafka Credentials:\n{:#?}", &credentials);
@@ -372,8 +423,8 @@ mod tests {
         // cargo test -p upstash --lib -- tests::delete_credential --exact --nocapture
 
         dotenv::dotenv().unwrap();
-        Client::from_env().initialize();
-        let client = Client::instance().unwrap();
+        Client::upstash_env().initialize();
+        let client = Client::upstash_instance().unwrap();
 
         let result = client
             .kafka()
@@ -388,8 +439,8 @@ mod tests {
         // cargo test -p upstash --lib -- tests::cluster_stats --exact --nocapture
 
         dotenv::dotenv().unwrap();
-        Client::from_env().initialize();
-        let client = Client::instance().unwrap();
+        Client::upstash_env().initialize();
+        let client = Client::upstash_instance().unwrap();
 
         let result = client
             .kafka()
@@ -404,8 +455,8 @@ mod tests {
         // cargo test -p upstash --lib -- tests::topic_stats --exact --nocapture
 
         dotenv::dotenv().unwrap();
-        Client::from_env().initialize();
-        let client = Client::instance().unwrap();
+        Client::upstash_env().initialize();
+        let client = Client::upstash_instance().unwrap();
 
         let result = client
             .kafka()
@@ -413,5 +464,106 @@ mod tests {
             .await
             .unwrap();
         println!("Upstash Topic Stats:\n{:#?}", &result);
+    }
+
+    #[tokio::test]
+    async fn produce() {
+        // cargo test -p upstash --lib -- tests::produce --exact --nocapture
+
+        dotenv::dotenv().unwrap();
+        Client::kafka_env().initialize();
+        let client = Client::kafka_instance().unwrap();
+
+        let messages = vec![
+            Message::new("one", "21", Some(0), Some("key")),
+            Message::new("one", "22", Some(0), Some("key")),
+            Message::new("one", "23", Some(0), Some("key")),
+        ];
+
+        let response = client.producer().produce(messages).await.unwrap();
+        println!("Upstash Kafka Produce:\n{:#?}", &response);
+    }
+
+    #[tokio::test]
+    async fn fetch() {
+        // cargo test -p upstash --lib -- tests::fetch --exact --nocapture
+
+        dotenv::dotenv().unwrap();
+        Client::kafka_env().initialize();
+        let client = Client::kafka_instance().unwrap();
+
+        let req = FetchRequest {
+            topic: "one".to_string(),
+            partition: 0,
+            offset: 5,
+        };
+
+        let response = client.fetcher().fetch(req).await;
+        println!("Upstash Kafka Fetch:\n{:#?}", &response);
+    }
+
+    #[tokio::test]
+    async fn consume() {
+        // cargo test -p upstash --lib -- tests::consume --exact --nocapture
+
+        dotenv::dotenv().unwrap();
+        Client::kafka_env().initialize();
+        let client = Client::kafka_instance().unwrap();
+
+        let req = ConsumeRequest {
+            topic: "one".to_string(),
+        };
+        let group = "g1";
+        let consumer = "c1";
+
+        let response = client.consumer().consume(group, consumer, req).await;
+        println!("Upstash Kafka Consume:\n{:#?}", &response);
+    }
+
+    #[tokio::test]
+    async fn commit() {
+        // cargo test -p upstash --lib -- tests::consume --exact --nocapture
+
+        dotenv::dotenv().unwrap();
+        Client::kafka_env().initialize();
+        let client = Client::kafka_instance().unwrap();
+
+        let req = vec![
+            CommitRequest::new("one", 0, 85),
+            CommitRequest::new("one", 0, 86),
+            CommitRequest::new("one", 0, 87),
+        ];
+        let group = "g1";
+        let consumer = "c1";
+
+        let response = client.handler("").commit(group, consumer, req).await;
+        println!("Upstash Kafka Commit:\n{:#?}", &response);
+    }
+
+    #[tokio::test]
+    async fn list_consumer() {
+        // cargo test -p upstash --lib -- tests::list_consumer --exact --nocapture
+
+        dotenv::dotenv().unwrap();
+        Client::kafka_env().initialize();
+        let client = Client::kafka_instance().unwrap();
+
+        let response = client.handler("").list_consumer().await;
+        println!("Upstash Kafka List Consumer:\n{:#?}", &response);
+    }
+
+    #[tokio::test]
+    async fn delete_consumer() {
+        // cargo test -p upstash --lib -- tests::delete_consumer --exact --nocapture
+
+        dotenv::dotenv().unwrap();
+        Client::kafka_env().initialize();
+        let client = Client::kafka_instance().unwrap();
+
+        let group = "g1";
+        let consumer = "c1";
+
+        let response = client.handler("").delete_consumer(group, consumer).await;
+        println!("Upstash Kafka Delete Consumer:\n{:#?}", &response);
     }
 }
